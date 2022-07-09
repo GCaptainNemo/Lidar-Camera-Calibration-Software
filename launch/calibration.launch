@@ -1,0 +1,8 @@
+<launch>
+	<param name="lidar_dir" type="string" value="/media/why/LENOVO_USB_HDD/ir_rgb_registration_data_collect/0071_lidar.bag" />	
+	<!--false: pointcloud2, true: custommsg -->
+	<param name="lidar_type" type="bool" value="true" /> 
+	<param name="img_dir" type="string" value="/media/why/LENOVO_USB_HDD/ir_rgb_registration_data_collect/0071_rgb.jpg" />
+	<param name="camera_file" type="string" value="/home/why/ros_self/lidar_camera_manual/src/lidar_camera_manual/config/camera_config.yaml" />
+	<param name="calib_file" type="string" value="/home/why/ros_self/lidar_camera_manual/src/lidar_camera_manual/config/calib_config.yaml" />
+</launch>
