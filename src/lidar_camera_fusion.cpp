@@ -1,54 +1,54 @@
 #include "lidar_camera_fusion.h"
 
 #include <stdio.h>
-#include <boost/foreach.hpp>
 
+#include <boost/foreach.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <image_transport/image_transport.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/uniform_sampling.h>
 #include <Eigen/Dense>
 #include <Eigen/Core>
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
-#include <image_transport/image_transport.h>
 #include <sensor_msgs/image_encodings.h>
-#include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/PointCloud2.h>
 
 #include "livox_ros_driver/CustomMsg.h"
-
 #include "io_utils.h"
 
-#define IS_DEBUG
+// #define IS_DEBUG
 
 LidarCameraFusion::LidarCameraFusion() {
   ROS_INFO("------------ intialize ----------\n");
-  raw_lidar_cloud_.reset(new PointCloudXYZI());
+  raw_lidar_cloud_.reset(new pcl::PointCloud<pcl::PointXYZI>());
 }
 
 void LidarCameraFusion::LoadInitParametersPy(InitialParametersStruct* init_params) {
-  calib_setting_path_ = std::string(init_params->calib_file_address);
-  lidar_path_ = std::string(init_params->lidar_address);
+  std::string lidar_path(init_params->lidar_address);
+  bool lidar_type;
   if (std::string(init_params->lidar_type) == std::string("true")) {
-    lidar_type_ = true;
+    lidar_type = true;
   } else {
-    lidar_type_ = false;
+    lidar_type = false;
   }
-  img_path_ = std::string(init_params->img_address);
-  std::cout << "calib_setting_path_ = " << calib_setting_path_ << ", "
-            << "lidar_path_ = " << lidar_path_ << ", "
-            << "lidar_type_ = " << lidar_type_ << ", "
-            << "img_path_ = " << img_path_ << std::endl;
-  if (!IsFileExist(lidar_path_.c_str()) || !IsFileExist(img_path_.c_str())) {
+  std::string img_path(init_params->img_address);
+  std::cout << "lidar_path = " << lidar_path << ", "
+            << "lidar_type = " << lidar_type << ", "
+            << "img_path = " << img_path << std::endl;
+  if (!IsFileExist(lidar_path.c_str()) || !IsFileExist(img_path.c_str())) {
     std::cout << "Not Found" << std::endl;
   } else {
-    RegisterImage(img_path_, &image_);
-    RegisterLidar(lidar_path_, raw_lidar_cloud_, lidar_type_);
+    RegisterImage(img_path);
+    RegisterLidar(lidar_path, lidar_type);
   }
 }
 
@@ -102,16 +102,14 @@ ImageStruct* LidarCameraFusion::LoadCalibParametersPy(CalibrationParametersStruc
   return img_struct;
 }
 
-void LidarCameraFusion::RegisterImage(const std::string& img_dir, cv::Mat* img) {
-  *img = cv::imread(img_dir, 1);
-  width_ = img->cols;
-  height_ = img->rows;
-  std::cout << "in RegisterImage: ROW, COL = " << img->rows << ", " << img->cols << std::endl;
+void LidarCameraFusion::RegisterImage(const std::string& img_dir) {
+  image_ = cv::imread(img_dir, 1);
+  width_ = image_.cols;
+  height_ = image_.rows;
+  std::cout << "in RegisterImage: ROW, COL = " << height_ << ", " << width_ << std::endl;
 }
 
-void LidarCameraFusion::RegisterLidar(const std::string& lidar_dir, 
-                              PointCloudXYZI::Ptr& pc_ptr_xyzi_, 
-                              bool CUSTOM_MSG) {
+void LidarCameraFusion::RegisterLidar(const std::string& lidar_dir, bool CUSTOM_MSG) {
   // reference: https://github.dev/hku-mars/livox_camera_calib
   // CustomMsg: intensity整数部分是强度，小数部分e->int(1 / e - 1 + 0.5)是线数
   // PointCloud2: intensity是强度
@@ -134,7 +132,7 @@ void LidarCameraFusion::RegisterLidar(const std::string& lidar_dir,
             if (livox_msg->points[i].tag != 16) {
                 continue;
             }
-            PointType pt;
+            pcl::PointXYZI pt;
             pt.x = livox_msg->points[i].x;
             pt.y = livox_msg->points[i].y;
             pt.z = livox_msg->points[i].z;
@@ -143,7 +141,7 @@ void LidarCameraFusion::RegisterLidar(const std::string& lidar_dir,
             if(pt.x == 0 && pt.y == 0 && pt.z == 0) {
               continue;
             }
-            pc_ptr_xyzi_->push_back(pt);
+            raw_lidar_cloud_->push_back(pt);
           }
         }
       }
@@ -155,19 +153,24 @@ void LidarCameraFusion::RegisterLidar(const std::string& lidar_dir,
         if (livox_msg!= NULL)
         {
             for (int i = 0; i < size; ++i) {
-                PointType pt;
+                pcl::PointXYZI pt;
                 pt.x = raw_pcl_ptr->points[i].x;
                 pt.y = raw_pcl_ptr->points[i].y;
                 pt.z = raw_pcl_ptr->points[i].z;
                 pt.intensity = raw_pcl_ptr->points[i].intensity;
                 if(pt.x == 0 && pt.y == 0 && pt.z == 0){continue;}
-                pc_ptr_xyzi_->push_back(pt);
+                raw_lidar_cloud_->push_back(pt);
             }
         }
       }
   }
   ROS_INFO("frame num = %d", frame_num);
-  ROS_INFO("lidar point cloud num = %d", pc_ptr_xyzi_->points.size());
+  ROS_INFO("Before Uniform Sampling, lidar point cloud num = %d", raw_lidar_cloud_->points.size());
+  pcl::UniformSampling<pcl::PointXYZI> sor;
+  sor.setInputCloud(raw_lidar_cloud_);
+  sor.setRadiusSearch(0.006f);
+  sor.filter(*raw_lidar_cloud_);
+  ROS_INFO("After Uniform Sampling, lidar point cloud num = %d", raw_lidar_cloud_->points.size());
   in_bag.close();
 }
 

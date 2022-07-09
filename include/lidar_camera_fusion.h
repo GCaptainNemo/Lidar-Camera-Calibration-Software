@@ -7,11 +7,8 @@
 #include <pcl/point_types.h>
 
 typedef Eigen::Matrix<double, 6, 1> Vector6d;
-typedef pcl::PointXYZI PointType;
-typedef pcl::PointCloud<PointType> PointCloudXYZI;
 
 typedef struct InitialParametersStruct {
-  char* calib_file_address;
   char* lidar_address;
   char* lidar_type;
   char* img_address;
@@ -50,10 +47,8 @@ class LidarCameraFusion {
   LidarCameraFusion();
   void LoadInitParametersPy(InitialParametersStruct* init_params);
   ImageStruct* LoadCalibParametersPy(CalibrationParametersStruct* calib_params);
-  void RegisterImage(const std::string& img_dir, cv::Mat* img);
-  void RegisterLidar(const std::string& lidar_dir,
-                     PointCloudXYZI::Ptr& pc_ptr_xyzi_,
-                     bool CUSTOM_MSG);
+  void RegisterImage(const std::string& img_dir);
+  void RegisterLidar(const std::string& lidar_dir, bool CUSTOM_MSG);
   cv::Mat GetProjectionImg(const Vector6d& extrinsic_params);
   void ProjectLidar2Img(const Vector6d& extrinsic_params,
                         const pcl::PointCloud<pcl::PointXYZI>::Ptr& lidar_cloud,
@@ -61,24 +56,33 @@ class LidarCameraFusion {
                         bool is_fill_img,
                         cv::Mat& projection_img);
   cv::Mat FillImg(const cv::Mat& input_img,
-                   const Direction first_direct,
-                   const Direction second_direct);
+                  const Direction first_direct,
+                  const Direction second_direct);
   void MapJet(double v, double vmin, double vmax,
               uint8_t* r, uint8_t* g, uint8_t* b);
  
  private:
-  float fx_, fy_, cx_, cy_, k1_, k2_, p1_, p2_, k3_;
-  float tx_, ty_, tz_, roll_, pitch_, yaw_;
-  bool lidar_type_;
-  int width_;
-  int height_;
-  cv::Mat image_;
-  pcl::PointCloud<pcl::PointXYZI>::Ptr raw_lidar_cloud_;  // 存储从pcd/bag处获取的原始点云
+  float fx_ = 0.0f;
+  float fy_ = 0.0f;
+  float cx_ = 0.0f;
+  float cy_ = 0.0f;
+  float k1_ = 0.0f;
+  float k2_ = 0.0f;
+  float p1_ = 0.0f;
+  float p2_ = 0.0f;
+  float k3_ = 0.0f;
+  float tx_ = 0.0f;
+  float ty_ = 0.0f;
+  float tz_ = 0.0f;
+  float roll_ = 0.0f;
+  float pitch_ =  0.0f;
+  float yaw_ = 0.0f;
+  int width_ = 0.0f;
+  int height_ = 0.0f;
   int min_depth_ = 2.5;
   int max_depth_ = 50;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr raw_lidar_cloud_ = nullptr;
+  cv::Mat image_;
   pcl::PCDWriter writer;
-  std::string lidar_path_;
-  std::string img_path_;
-  std::string calib_setting_path_;
 };
 

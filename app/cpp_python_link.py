@@ -4,7 +4,6 @@ clib = ctypes.CDLL("../build/devel/lib/libLidarCameraFusion.so")
 
 class InitialParametersStruct(ctypes.Structure):
     _fields_ = [  
-                 ("calib_file_address", ctypes.c_char_p), 
                  ("lidar_address", ctypes.c_char_p), 
                  ("lidar_type", ctypes.c_char_p), 
                  ("img_address", ctypes.c_char_p),

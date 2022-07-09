@@ -1,3 +1,4 @@
+#include "io_utils.h"
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -5,7 +6,6 @@
 
 #include <opencv2/opencv.hpp>
 
-#include "io_utils.h"
 
 int IsFolderExist(const char* path)
 {
